@@ -1,6 +1,10 @@
 /**
- * Core imports for cryptographic operations and Merkle tree functionality
+ * Evolunary Agent State Machine
+ * 
+ * Core logic for managing agent state transitions, Merkle-based verification,
+ * cryptographic signatures, and persistent logging for behavioral trust.
  */
+
 import { createHash, createPrivateKey, createSign, createVerify } from 'crypto';
 import { MerkleTree } from 'merkletreejs';
 import { StateMachineLogger } from './logger';
@@ -8,105 +12,92 @@ import SHA256 from 'crypto-js/sha256';
 import sql from '../utils/sql';
 
 /**
- * AgentState defines the possible states an autonomous agent can be in
- * This forms the basis of the state machine's transition graph
+ * AgentState defines the operational phases in an Evolunary agent’s lifecycle.
+ * These map the transition flow of logic, execution, and verification.
  */
 export type AgentState = 
-  'IDLE' |      // Initial resting state
-  'INIT' |      // Initialization state
-  'GOAL_PARSE' | // Parsing and understanding goals
-  'PLANNING' |   // Strategic planning phase
-  'EXECUTING' |  // Executing planned actions
-  'VALIDATING' | // Validating results
-  'REPORTING' |  // Generating reports
-  'COMPLETED' |  // Successfully completed
-  'ERROR' |      // Error state
-  'TERMINATED';  // Final terminated state
+  'IDLE' |
+  'INIT' |
+  'GOAL_PARSE' |
+  'PLANNING' |
+  'EXECUTING' |
+  'VALIDATING' |
+  'REPORTING' |
+  'COMPLETED' |
+  'ERROR' |
+  'TERMINATED';
 
-/**
- * Array of all possible agent states for iteration and validation
- */
+/** Complete list of all agent states, useful for validation and state mapping */
 export const AgentStates: AgentState[] = [
-  'IDLE',
-  'INIT',
-  'GOAL_PARSE',
-  'PLANNING',
-  'EXECUTING',
-  'VALIDATING',
-  'REPORTING', 
-  'COMPLETED',
-  'ERROR',
-  'TERMINATED'
+  'IDLE', 'INIT', 'GOAL_PARSE', 'PLANNING', 'EXECUTING',
+  'VALIDATING', 'REPORTING', 'COMPLETED', 'ERROR', 'TERMINATED'
 ];
 
 /**
- * Represents a transition between states
- * Captures the source and destination states along with associated metadata
+ * Describes a transition from one state to another, along with context.
  */
 export interface StateTransition {
-  from: AgentState;    // Source state
-  to: AgentState;      // Destination state
-  action: string;      // Action triggering the transition
-  params: any;         // Additional parameters for the transition
+  from: AgentState;
+  to: AgentState;
+  action: string;
+  params: any;
 }
 
 /**
- * Represents an action that can trigger a state transition
+ * Defines a triggerable state transition operation.
  */
 export interface StateTransitionAction {
-    action: string;    // Name of the action
-    params: any;       // Parameters for the action
+  action: string;
+  params: any;
 }
 
 /**
- * Cryptographic proof of a state transition
- * Implements a Merkle tree-based verification system
+ * Verifiable proof of a state change, using cryptographic signatures and Merkle roots.
  */
 export interface Proof {
-  stateHash: string;     // Hash of the current state
-  prevHash: string;      // Hash of the previous state
-  merkleRoot: string;    // Root of the Merkle tree
-  merkleProof: string[]; // Proof path in the Merkle tree
-  signature: string;     // Cryptographic signature
-  timestamp: number;     // Timestamp of proof generation
+  stateHash: string;
+  prevHash: string;
+  merkleRoot: string;
+  merkleProof: string[];
+  signature: string;
+  timestamp: number;
 }
 
 /**
- * Interface for handling state-specific logic
+ * Defines hooks and logic handlers for a specific state.
  */
 export interface StateHandler {
-  entry?: (data?: any) => Promise<StateTransition>;    // Logic executed on entering state
-  exit?: (data?: any) => Promise<StateTransition>;     // Logic executed on exiting state
-  actions?: Record<string, (data: any) => Promise<StateTransition>>; // State-specific actions
+  entry?: (data?: any) => Promise<StateTransition>;
+  exit?: (data?: any) => Promise<StateTransition>;
+  actions?: Record<string, (data: any) => Promise<StateTransition>>;
 }
 
 /**
- * Defines valid state transitions
- * Key: current state, Value: array of valid next states
+ * Defines valid next states for each state in the Evolunary graph.
  */
 const validTransitions: Record<AgentState, AgentState[]> = {
-    IDLE: ['INIT', 'ERROR', 'TERMINATED'],
-    INIT: ['GOAL_PARSE', 'ERROR', 'TERMINATED', 'IDLE'],
-    GOAL_PARSE: ['PLANNING', 'ERROR', 'TERMINATED', 'IDLE'],
-    PLANNING: ['PLANNING', 'EXECUTING', 'ERROR', 'TERMINATED', 'IDLE'],
-    EXECUTING: ['EXECUTING','VALIDATING', 'REPORTING', 'ERROR', 'TERMINATED', 'IDLE'],
-    VALIDATING: ['VALIDATING', 'COMPLETED', 'REPORTING', 'EXECUTING', 'ERROR', 'TERMINATED', 'IDLE'],
-    REPORTING: ['VALIDATING','REPORTING','COMPLETED', 'ERROR', 'TERMINATED', 'IDLE'],
-    COMPLETED: ['TERMINATED', 'IDLE'],
-    ERROR: ['TERMINATED', 'IDLE'],
-    TERMINATED: []
+  IDLE: ['INIT', 'ERROR', 'TERMINATED'],
+  INIT: ['GOAL_PARSE', 'ERROR', 'TERMINATED', 'IDLE'],
+  GOAL_PARSE: ['PLANNING', 'ERROR', 'TERMINATED', 'IDLE'],
+  PLANNING: ['PLANNING', 'EXECUTING', 'ERROR', 'TERMINATED', 'IDLE'],
+  EXECUTING: ['EXECUTING', 'VALIDATING', 'REPORTING', 'ERROR', 'TERMINATED', 'IDLE'],
+  VALIDATING: ['VALIDATING', 'COMPLETED', 'REPORTING', 'EXECUTING', 'ERROR', 'TERMINATED', 'IDLE'],
+  REPORTING: ['VALIDATING', 'REPORTING', 'COMPLETED', 'ERROR', 'TERMINATED', 'IDLE'],
+  COMPLETED: ['TERMINATED', 'IDLE'],
+  ERROR: ['TERMINATED', 'IDLE'],
+  TERMINATED: []
 };
 
 /**
- * Base class implementing core state machine functionality
- * Handles cryptographic operations and state history tracking
+ * Foundation class for Evolunary agents.
+ * Tracks state history, constructs Merkle trees, and generates verifiable proofs.
  */
 class BaseState {
-  protected stateHistory: string[] = [];        // History of state hashes
-  protected merkleTree: MerkleTree;            // Merkle tree for verification
-  protected id: string;                        // Unique identifier
-  protected sessionId: string;                 // Session identifier
-  protected privateKey: string;                // Private key for signing
+  protected stateHistory: string[] = [];
+  protected merkleTree: MerkleTree;
+  protected id: string;
+  protected sessionId: string;
+  protected privateKey: string;
 
   constructor(id: string, sessionId: string, privateKey: string) {
     this.id = id;
@@ -115,30 +106,23 @@ class BaseState {
     this.merkleTree = new MerkleTree([], SHA256);
   }
 
-  /**
-   * Creates a deterministic hash of a state transition
-   */
   protected hashState(state: StateTransition): string {
-    const stateStr = JSON.stringify({
+    const encoded = JSON.stringify({
       timestamp: Date.now(),
       from: state.from,
       to: state.to,
       action: state.action,
       params: state.params
     });
-    return SHA256(stateStr).toString();
+    return SHA256(encoded).toString();
   }
 
-  /**
-   * Generates cryptographic proof of a state transition
-   * Includes Merkle tree proof and digital signature
-   */
   protected generateProof(state: StateTransition): Proof {
     const stateHash = this.hashState(state);
     this.stateHistory.push(stateHash);
-    
+
     const leaves = [...this.stateHistory];
-    this.merkleTree = new MerkleTree(leaves,SHA256);
+    this.merkleTree = new MerkleTree(leaves, SHA256);
 
     const merkleRoot = this.merkleTree.getHexRoot();
     const merkleProof = this.merkleTree.getHexProof(stateHash);
@@ -153,176 +137,139 @@ class BaseState {
     };
   }
 
-  /**
-   * Signs data using the private key
-   */
   private sign(hash: string): string {
-    const privateKeyObject = createPrivateKey({
+    const key = createPrivateKey({
       key: Buffer.from(this.privateKey, 'hex'),
       format: 'der',
       type: 'pkcs8'
     });
-
     const signer = createSign('SHA256');
     signer.update(hash);
-    return signer.sign(privateKeyObject, 'hex');
+    return signer.sign(key, 'hex');
   }
 
-  /**
-   * Verifies a signature using the public key
-   */
   public verifySignature(hash: string, signature: string, publicKey: string): boolean {
-    const verify = createVerify('SHA256');
-    verify.update(hash);
-    return verify.verify(publicKey, Buffer.from(signature, 'hex'));
+    const verifier = createVerify('SHA256');
+    verifier.update(hash);
+    return verifier.verify(publicKey, Buffer.from(signature, 'hex'));
   }
 
-  /**
-   * Broadcasts state changes to a network (to be implemented)
-   */
   protected async broadcast(data: {
-    agentId: string,
-    sessionId: string,
-    fromState: string,
-    toState: string,
-    action: string,
-    proof: Proof
+    agentId: string;
+    sessionId: string;
+    fromState: string;
+    toState: string;
+    action: string;
+    proof: Proof;
   }): Promise<void> {
-    // Implement relay network broadcast
-
-    console.log("Broadcasting to database")
-    let res = await sql`
-        INSERT INTO execution_logs (agent_id, session_id, from_state, to_state, action, proof) 
-        VALUES (${data.agentId}, ${data.sessionId}, ${data.fromState}, ${data.toState}, ${data.action}, ${sql.json({
+    await sql`
+      INSERT INTO execution_logs (agent_id, session_id, from_state, to_state, action, proof)
+      VALUES (
+        ${data.agentId},
+        ${data.sessionId},
+        ${data.fromState},
+        ${data.toState},
+        ${data.action},
+        ${sql.json({
           stateHash: data.proof.stateHash,
           prevHash: data.proof.prevHash,
           merkleRoot: data.proof.merkleRoot,
           merkleProof: data.proof.merkleProof,
           signature: data.proof.signature,
           timestamp: data.proof.timestamp
-        })})
+        })}
+      )
     `;
-
-    console.log(res)
-
   }
 }
 
 /**
- * Represents a node in the state machine graph
+ * StateNode represents a graph node in the agent’s state machine.
  */
 export interface StateNode {
-    state: AgentState;
-    transitions: Map<AgentState, StateTransition>;
-  }
+  state: AgentState;
+  transitions: Map<AgentState, StateTransition>;
+}
 
 /**
- * Main state machine implementation for autonomous agents
- * Manages state transitions and maintains transition history
+ * Evolunary Agent State Machine
+ * Orchestrates valid state transitions, cryptographic verification, and persistent logging.
  */
 export class AgentStateMachine extends BaseState {
-    private currentState: AgentState = 'INIT';
-    private stateNodes: Map<AgentState, StateNode> = new Map();
-    private logger: StateMachineLogger<AgentState>;
-    
-    constructor(id: string, sessionId: string, privateKey: string, logger?: StateMachineLogger<AgentState>) {
-      super(id, sessionId, privateKey);
-      this.logger = logger || new StateMachineLogger<AgentState>();
-      this.initializeStates();
-    }
-  
-    /**
-     * Initializes the state machine graph
-     * Creates nodes and sets up valid transitions
-     */
-    private initializeStates(): void {
-      // Create nodes for all states
-      AgentStates.forEach(state => {
-        this.stateNodes.set(state, {
-          state,
-          transitions: new Map(),
-        });
-      });
-  
-      // Wire up transitions based on validTransitions
-      Object.entries(validTransitions).forEach(([fromState, toStates]) => {
-        const node = this.stateNodes.get(fromState as AgentState);
-        if (!node) return;
-  
-        toStates.forEach(toState => {
-          node.transitions.set(toState, {
-            from: fromState as AgentState,
-            to: toState,
-            action: '', // Will be set during actual transition
-            params: null
-          });
-        });
-      });
+  private currentState: AgentState = 'INIT';
+  private stateNodes: Map<AgentState, StateNode> = new Map();
+  private logger: StateMachineLogger<AgentState>;
 
-    //   console.log(this.stateNodes)
-    }
-  
-    /**
-     * Executes a state transition if valid
-     * Generates and logs cryptographic proof of transition
-     */
-    async transitionTo(state: AgentState, action: string, data?: any): Promise<Proof> {
-        const currentNode = this.stateNodes.get(this.currentState);
-        const nextNode = this.stateNodes.get(state);
-          
-        if (!currentNode || !currentNode.transitions.has(state)) {
-          throw new Error(`Invalid transition from ${this.currentState} to ${state}`);
-        }
-    
-        let proof = this.generateProof({ 
-            from: this.currentState,
-            to: state,
-            action: action,
-            params: data
-        });
-
-        this.logger.logTransition(
-            this.id,
-            this.sessionId,
-            this.currentState,
-            state,
-            action,
-            proof
-        );
-
-        await this.broadcast({
-            agentId: this.id,
-            sessionId: this.sessionId,
-            fromState: this.currentState,
-            toState: state,
-            action: action,
-            proof: proof
-        });
-
-        this.currentState = state;
-
-        return proof;
-      }
-  
-    /**
-     * Returns array of valid states that can be transitioned to
-     */
-    getAvailableTransitions(): AgentState[] {
-      const node = this.stateNodes.get(this.currentState);
-      return node ? Array.from(node.transitions.keys()) : [];
-    }
-  
-    /**
-     * Returns the current state of the machine
-     */
-    getCurrentState(): AgentState {
-      return this.currentState;
-    }
-
-    /**
-     * Returns formatted logs of state transitions
-     */
-    getLogs(): string {
-        return this.logger.getLogs(this.sessionId);
-    }
+  constructor(id: string, sessionId: string, privateKey: string, logger?: StateMachineLogger<AgentState>) {
+    super(id, sessionId, privateKey);
+    this.logger = logger || new StateMachineLogger<AgentState>();
+    this.initializeStates();
   }
+
+  private initializeStates(): void {
+    AgentStates.forEach(state => {
+      this.stateNodes.set(state, { state, transitions: new Map() });
+    });
+
+    Object.entries(validTransitions).forEach(([from, toList]) => {
+      const node = this.stateNodes.get(from as AgentState);
+      if (!node) return;
+      toList.forEach(to => {
+        node.transitions.set(to, {
+          from: from as AgentState,
+          to,
+          action: '',
+          params: null
+        });
+      });
+    });
+  }
+
+  /**
+   * Executes a valid state transition.
+   * Verifies legality, logs proof, and persists event to storage.
+   */
+  async transitionTo(state: AgentState, action: string, data?: any): Promise<Proof> {
+    const currentNode = this.stateNodes.get(this.currentState);
+    if (!currentNode || !currentNode.transitions.has(state)) {
+      throw new Error(`Invalid transition: ${this.currentState} → ${state}`);
+    }
+
+    const proof = this.generateProof({
+      from: this.currentState,
+      to: state,
+      action,
+      params: data
+    });
+
+    this.logger.logTransition(this.id, this.sessionId, this.currentState, state, action, proof);
+
+    await this.broadcast({
+      agentId: this.id,
+      sessionId: this.sessionId,
+      fromState: this.currentState,
+      toState: state,
+      action,
+      proof
+    });
+
+    this.currentState = state;
+    return proof;
+  }
+
+  /** Returns next valid states for current context */
+  getAvailableTransitions(): AgentState[] {
+    const node = this.stateNodes.get(this.currentState);
+    return node ? Array.from(node.transitions.keys()) : [];
+  }
+
+  /** Returns the current operational state */
+  getCurrentState(): AgentState {
+    return this.currentState;
+  }
+
+  /** Returns formatted transition history */
+  getLogs(): string {
+    return this.logger.getLogs(this.sessionId);
+  }
+}

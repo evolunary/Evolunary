@@ -1,125 +1,97 @@
 /**
- * State machine logging module with formatted output and cryptographic verification
- * Provides structured logging for state transitions with ASCII art headers
- * @module stateMachine/logger
+ * Evolunary State Machine Logger
+ * 
+ * Secure, structured logging for agent state transitions with cryptographic verification.
+ * @module evolunary/logger
  */
 
 import { Proof } from "./sm";
 
 /**
- * ASCII art header template for log output
- * Displays system status, runtime info and verification data
+ * Generates a branded Evolunary session header.
+ * Displays runtime metadata in a clean, visual format.
  * 
- * @param status - Current operational status ("ACTIVE" | "OFFLINE")
- * @param date - ISO timestamp of log generation
- * @param signature - Cryptographic signature for log verification
- * @returns Formatted ASCII art header string
+ * @param status - Agent status: "ACTIVE" | "OFFLINE"
+ * @param date - Timestamp of log generation
+ * @param sessionId - Current session ID
+ * @returns Formatted header string
  */
-const LOG_HEADER = `
-_____  _____            _____ _    _ _               
-|  __ \|  __ \     /\   / ____| |  | | |        /\    
-| |  | | |__) |   /  \ | |    | |  | | |       /  \   
-| |  | |  _  /   / /\ \| |    | |  | | |      / /\ \  
-| |__| | | \ \  / ____ \ |____| |__| | |____ / ____ \ 
-|_____/|_|  \_\/_/    \_\_____|\____/|______/_/    \_\
-
-Distributed Rules for Agent Consensus in Unified Logic Applications
-`
-
-/**
- * Interface defining core logging functionality for state transitions
- * Provides structured logging of state changes with cryptographic proofs
- */
-interface StateLogger<State extends string> {
-    /**
-     * Logs a state transition with associated metadata and proof
-     * @param agentId - Unique identifier of the agent
-     * @param sessionId - Current session identifier
-     * @param from - Source state of transition
-     * @param to - Destination state of transition
-     * @param action - Action that triggered the transition
-     * @param proof - Cryptographic proof of the transition
-     */
-    logTransition(
-      agentId: string,
-      sessionId: string, 
-      from: State,
-      to: State,
-      action: string,
-      proof: Proof
-    ): void;
+function logHeader(status: string, date: string, sessionId: string): string {
+  return `
+  ┌────────────────────────────────────────────┐
+  │              EVOLUNARY LOGGER              │
+  ├────────────────────────────────────────────┤
+  │ Status: ${status}                          │
+  │ Time:   ${date}                            │
+  │ Session: ${sessionId}                      │
+  └────────────────────────────────────────────┘
+`;
 }
 
 /**
- * Implementation of StateLogger interface for autonomous agent state machines
- * Provides secure logging with cryptographic verification and formatted output
+ * Interface for Evolunary transition loggers.
+ * Used to track and verify agent state transitions.
  */
-export class StateMachineLogger<State extends string> implements StateLogger<State> {
-    /** Array storing chronological log entries */
-    private logs: string[] = [];
+interface StateLogger<State extends string> {
+  logTransition(
+    agentId: string,
+    sessionId: string,
+    from: State,
+    to: State,
+    action: string,
+    proof: Proof
+  ): void;
+}
 
-    /**
-     * Formats cryptographic signatures for readable output
-     * Truncates long signatures while preserving verification capability
-     * 
-     * @param signature - Full cryptographic signature
-     * @returns Formatted signature string with length indicator
-     */
-    formatSignature(signature: string) {
-        const 
-          startLength = 8,        // Length of preserved start section
-          endLength = 8,          // Length of preserved end section
-          separator = '...',      // Indicator for truncated section
-          includeLength = true    // Whether to append total length
-      
-        if (!signature) return '';
-        
-        // Return full signature if shorter than truncation threshold
-        if (signature.length <= startLength + endLength) {
-          return signature;
-        }
-      
-        const start = signature.substring(0, startLength);
-        const end = signature.substring(signature.length - endLength);
-        const formatted = `${start}${separator}${end}`;
-        
-        return includeLength ? `${formatted} (${signature.length})` : formatted;
-    }
+/**
+ * Evolunary implementation of StateLogger
+ * Tracks state transitions with readable logs and signature verification
+ */
+export class EvolunaryStateLogger<State extends string> implements StateLogger<State> {
+  private logs: string[] = [];
 
-    /**
-     * Logs a state transition with associated metadata and proof
-     * Generates timestamped entries with formatted signatures
-     * 
-     * @param agentId - Unique identifier of the agent
-     * @param sessionId - Current session identifier 
-     * @param from - Source state of transition
-     * @param to - Destination state of transition
-     * @param action - Action that triggered the transition
-     * @param proof - Cryptographic proof of the transition
-     * @returns Formatted log entry string
-     */
-    logTransition(
-      agentId: string,
-      sessionId: string,
-      from: State,
-      to: State, 
-      action: string,
-      proof: Proof
-    ): string {
-        let log = `[${Date.now()}] ${agentId} ${sessionId} ${from}->${to}: ${action}; sig(${this.formatSignature(proof.signature)})`
-        console.log(log);
-        this.logs.push(log);
-        return log
-    }
+  /**
+   * Shortens cryptographic signature for log readability.
+   * Displays head + tail with optional length.
+   */
+  formatSignature(signature: string): string {
+    const start = signature.slice(0, 8);
+    const end = signature.slice(-8);
+    const formatted = `${start}...${end}`;
+    return `${formatted} (${signature.length})`;
+  }
 
-    /**
-     * Retrieves complete formatted logs for a session
-     * Includes ASCII art header and chronological log entries
-     * 
-     * @param sessionId - Session identifier for log filtering
-     * @returns Complete formatted log output as string
-     */
-    public getLogs(sessionId: string): string {
-        return LOG_HEADER("ACTIVE", new Date().toISOString(), sessionId) + '\n' + this.logs.join('\n')
-    }
+  /**
+   * Logs a state change with timestamp and proof metadata.
+   * 
+   * @param agentId - Unique identifier for the agent
+   * @param sessionId - Current session scope
+   * @param from - Previous state
+   * @param to - Next state
+   * @param action - Action that triggered the change
+   * @param proof - Verifiable cryptographic proof
+   */
+  logTransition(
+    agentId: string,
+    sessionId: string,
+    from: State,
+    to: State,
+    action: string,
+    proof: Proof
+  ): string {
+    const timestamp = new Date().toISOString();
+    const log = `[${timestamp}] ${agentId} ${sessionId} ${from} -> ${to}: ${action}; sig(${this.formatSignature(proof.signature)})`;
+    console.log(log);
+    this.logs.push(log);
+    return log;
+  }
+
+  /**
+   * Outputs a full log trace for the current session.
+   * Includes branded header and all log entries.
+   */
+  getLogs(sessionId: string): string {
+    const header = logHeader("ACTIVE", new Date().toISOString(), sessionId);
+    return header + this.logs.join("\n");
+  }
 }
