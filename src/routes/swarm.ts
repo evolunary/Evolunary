@@ -11,7 +11,7 @@ import { getAgentsByUser, getAgentById } from '../agent/model';
 
 const router = Router();
 
-// 🔍 GET /swarm/status
+// GET /swarm/status
 // Returns current swarm presence and state of all user-linked agents
 router.get('/status', authenticatedMust, async (req: AuthenticatedRequest, res) => {
     const { userId } = req.user!;
@@ -27,7 +27,7 @@ router.get('/status', authenticatedMust, async (req: AuthenticatedRequest, res) 
     res.json({ agents: statuses });
 });
 
-// 🚀 POST /swarm/start
+// POST /swarm/start
 // Starts all inactive agents in the swarm
 router.post('/start', authenticatedMust, async (req: AuthenticatedRequest, res) => {
     const { userId } = req.user!;
@@ -45,7 +45,7 @@ router.post('/start', authenticatedMust, async (req: AuthenticatedRequest, res) 
     res.json({ message: 'Swarm started', startedAgents: started });
 });
 
-// 🛑 POST /swarm/stop
+// POST /swarm/stop
 // Halts all active agents in the swarm
 router.post('/stop', authenticatedMust, async (req: AuthenticatedRequest, res) => {
     const { userId } = req.user!;
@@ -81,7 +81,7 @@ router.post('/start/:agentId', authenticatedMust, async (req: AuthenticatedReque
     res.json({ message: 'Agent started', agentId, status: 'running' });
 });
 
-// 🛑 POST /swarm/stop/:agentId
+// POST /swarm/stop/:agentId
 // Halts a specific agent instance by ID
 router.post('/stop/:agentId', authenticatedMust, async (req: AuthenticatedRequest, res) => {
     const { agentId } = req.params;
