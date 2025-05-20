@@ -47,7 +47,7 @@ interface StateLogger<State extends string> {
  * Evolunary implementation of StateLogger
  * Tracks state transitions with readable logs and signature verification
  */
-export class EvolunaryStateLogger<State extends string> implements StateLogger<State> {
+export class StateMachineLogger<State extends string> implements StateLogger<State> {
   private logs: string[] = [];
 
   /**
