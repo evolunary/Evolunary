@@ -2,13 +2,13 @@
 
 **Evolutionary Logic for Distributed Autonomous Agents**
 
-![Evolunary Banner](https://yourdomain.com/banner-placeholder.png)
+![Evolunary Banner](banner.png)
 
 ---
 
 ## Overview
 
-**Evolunary** is a TypeScript-powered agent framework for building distributed, state-driven AI entities capable of autonomous evolution, verifiable behavior, and collaborative problem-solving. At its core, Evolunary combines secure cryptographic state verification, dynamic persona development, and multi-agent coordination â€” all guided by a cyclical behavioral model influenced by natural rhythms.
+**Evolunary** is a TypeScript-powered agent framework for building distributed, state-driven AI entities capable of autonomous evolution, verifiable behavior, and collaborative problem-solving. At its core, Evolunary combines secure cryptographic state verification, dynamic persona development, and multi-agent coordination all guided by a cyclical behavioral model influenced by natural rhythms.
 
 Whether you're designing persistent AI companions, logic-driven bots, or multi-agent swarms, Evolunary offers a flexible, proof-based foundation to scale intelligent behavior with clarity and trust.
 
@@ -23,7 +23,7 @@ Whether you're designing persistent AI companions, logic-driven bots, or multi-a
   Agents adapt their logic according to configurable cycles (e.g., lunar phases), enabling rhythm-based evolution and lifecycle modeling.
 
 - **Persona Memory Engine**  
-  Agents develop distinct personas based on historical data, goals, and customizable traits â€” enabling persistent, evolving behavior.
+  Agents develop distinct personas based on historical data, goals, and customizable traits enabling persistent, evolving behavior.
 
 - **Modular Rule Logic**  
   Define adaptive rule sets per agent or agent group. Logic updates dynamically based on internal state or external data.
@@ -35,7 +35,7 @@ Whether you're designing persistent AI companions, logic-driven bots, or multi-a
   Pull structured knowledge from APIs or feeds to inform agent decision-making and environmental awareness.
 
 - **Visualized Evolution**  
-  Optional terminal-based logs and Gothic-inspired ASCII visuals for inspecting agent transitions and transformations in real time.
+  Optional terminal-based logs for inspecting agent transitions and transformations in real time.
 
 ---
 
@@ -155,4 +155,4 @@ npm test
 
 ## License
 
-MIT License â€“ see the [LICENSE](./LICENSE) file for full details.
+MIT License see the [LICENSE](./LICENSE) file for full details.
