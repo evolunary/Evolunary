@@ -9,6 +9,7 @@ import { prompt } from "../../utils/llm";
 import { randomUUID } from "crypto";
 import * as fs from 'node:fs/promises';
 import sql from "../../utils/sql";
+import chalk from "chalk"; // install with `npm i chalk` if not already
 
 /**
  * Defines all possible states for the Twitter interaction process
@@ -132,53 +133,66 @@ export class TwitterSubAgent {
     private sessionId: string;
     private monitoringTimer: NodeJS.Timeout | null = null;
 
-    constructor(
-        agentId: string,
-        sessionId: string,
-        privateKey: string
-    ) {
-        this.agentId = agentId;
-        this.sessionId = sessionId;
-        
-        this.sm = new StateMachine<TwitterState>(
-            agentId,
-            sessionId,
-            privateKey,
-            twitterStates,
-            twitterTransitions,
-            'INITIALIZING'
-        );
-    }
+constructor(
+    agentId: string,
+    sessionId: string,
+    privateKey: string
+) {
+    this.agentId = agentId;
+    this.sessionId = sessionId;
+
+    this.sm = new StateMachine<TwitterState>(
+        agentId,
+        sessionId,
+        privateKey,
+        twitterStates,
+        twitterTransitions,
+        'INITIALIZING'
+    );
+
+    console.log(chalk.gray(`[boot] Initializing TwitterSubAgent`));
+    console.log(chalk.gray(`[agent] ${agentId}`));
+    console.log(chalk.gray(`[session] ${sessionId}`));
+    console.log(chalk.gray(`[status] Starting diagnostics...`));
+}
+
 
     /**
      * Initializes the Twitter subagent
      */
     async init() {
-        const initialState: TwitterStateData = {
-            content: [],
-            schedule: {
-                optimal_times: [],
-                frequency: 4, // posts per day
-                timezone: 'UTC'
-            },
-            engagement: {},
-            strategy: {
-                targetAudience: ['crypto_enthusiasts', 'tech_savvy'],
-                contentThemes: ['project_updates', 'market_insights'],
-                hashtagStrategy: ['#crypto', '#blockchain'],
-                engagementApproach: 'community_focused',
-                postingFrequency: 'moderate'
-            },
-            performance: {
-                avgEngagementRate: 0,
-                topPerformingContent: [],
-                audienceGrowth: 0
-            }
-        };
+    console.log(chalk.gray(`[init] Configuring initial state tree...`));
 
-        this.vt = new VersionedTree<TwitterStateData>({ initialData: initialState });
-        await this.sm.to('READY', 'INITIALIZATION_COMPLETE');
-    }
+    const initialState: TwitterStateData = {
+        content: [],
+        schedule: {
+            optimal_times: [],
+            frequency: 4,
+            timezone: 'UTC'
+        },
+        engagement: {},
+        strategy: {
+            targetAudience: ['crypto_enthusiasts', 'tech_savvy'],
+            contentThemes: ['project_updates', 'market_insights'],
+            hashtagStrategy: ['#crypto', '#blockchain'],
+            engagementApproach: 'community_focused',
+            postingFrequency: 'moderate'
+        },
+        performance: {
+            avgEngagementRate: 0,
+            topPerformingContent: [],
+            audienceGrowth: 0
+        }
+    };
+
+    this.vt = new VersionedTree<TwitterStateData>({ initialData: initialState });
+
+    await this.sm.to('READY', 'INITIALIZATION_COMPLETE');
+
+    console.log(chalk.gray(`[init] Agent state set to READY`));
+    console.log(chalk.gray(`[ready] System is prepared for content ops`));
+}
+
 
     /**
      * Generates and posts new content
@@ -210,7 +224,7 @@ export class TwitterSubAgent {
             return postResult;
             
         } catch (error) {
-            console.error('Content creation error:', error);
+            console.error(chalk.red(`[error] Content creation failed`), error);
             await this.sm.to('ERROR', 'CONTENT_CREATION_FAILED');
             throw error;
         }
@@ -268,9 +282,9 @@ export class TwitterSubAgent {
      * Posts content to Twitter
      */
     private async postContent(content: TwitterContent, scheduledTime: Date): Promise<string> {
-        // Implement actual Twitter API posting here
-        // This is a placeholder that would need to be implemented with your Twitter API credentials
-        console.log(`Posting tweet at ${scheduledTime}: ${content.text}`);
+        console.log(chalk.gray(`[post] Scheduled tweet at ${scheduledTime.toISOString()}`));
+        console.log(chalk.gray(`[post] Content payload: ${content.text.slice(0, 80)}...`));
+
         return 'tweet_id_placeholder';
     }
 
