@@ -9,7 +9,7 @@ import { prompt } from "../../utils/llm";
 import { randomUUID } from "crypto";
 import * as fs from 'node:fs/promises';
 import sql from "../../utils/sql";
-import chalk from "chalk"; // install with `npm i chalk` if not already
+import chalk from "chalk";
 
 /**
  * Defines all possible states for the Twitter interaction process
@@ -132,224 +132,225 @@ export class TwitterSubAgent {
     private agentId: string;
     private sessionId: string;
     private monitoringTimer: NodeJS.Timeout | null = null;
+    private isTesting: boolean = true;
 
-constructor(
-    agentId: string,
-    sessionId: string,
-    privateKey: string
-) {
-    this.agentId = agentId;
-    this.sessionId = sessionId;
-
-    this.sm = new StateMachine<TwitterState>(
-        agentId,
-        sessionId,
-        privateKey,
-        twitterStates,
-        twitterTransitions,
-        'INITIALIZING'
-    );
-
-    console.log(chalk.gray(`[boot] Initializing TwitterSubAgent`));
-    console.log(chalk.gray(`[agent] ${agentId}`));
-    console.log(chalk.gray(`[session] ${sessionId}`));
-    console.log(chalk.gray(`[status] Starting diagnostics...`));
-}
-
-
-    /**
-     * Initializes the Twitter subagent
-     */
-    async init() {
-    console.log(chalk.gray(`[init] Configuring initial state tree...`));
-
-    const initialState: TwitterStateData = {
-        content: [],
-        schedule: {
-            optimal_times: [],
-            frequency: 4,
-            timezone: 'UTC'
-        },
-        engagement: {},
-        strategy: {
-            targetAudience: ['crypto_enthusiasts', 'tech_savvy'],
-            contentThemes: ['project_updates', 'market_insights'],
-            hashtagStrategy: ['#crypto', '#blockchain'],
-            engagementApproach: 'community_focused',
-            postingFrequency: 'moderate'
-        },
-        performance: {
-            avgEngagementRate: 0,
-            topPerformingContent: [],
-            audienceGrowth: 0
-        }
+    private testDiagnostics: {
+        bootTime: string;
+        stateTransitions: { from: string; to: string; reason: string; timestamp: string }[];
+        postedTweets: { text: string; time: string }[];
+        heartbeats: string[];
+    } = {
+        bootTime: new Date().toISOString(),
+        stateTransitions: [],
+        postedTweets: [],
+        heartbeats: []
     };
 
-    this.vt = new VersionedTree<TwitterStateData>({ initialData: initialState });
+    constructor(agentId: string, sessionId: string, privateKey: string) {
+        this.agentId = agentId;
+        this.sessionId = sessionId;
 
-    await this.sm.to('READY', 'INITIALIZATION_COMPLETE');
+        this.sm = new StateMachine<TwitterState>(
+            agentId,
+            sessionId,
+            privateKey,
+            twitterStates,
+            twitterTransitions,
+            'INITIALIZING'
+        );
 
-    console.log(chalk.gray(`[init] Agent state set to READY`));
-    console.log(chalk.gray(`[ready] System is prepared for content ops`));
-}
+        this.logStatus("BOOT", "Initializing Vanta AI agent");
+        console.log(chalk.gray(`[agent] ${agentId}`));
+        console.log(chalk.gray(`[session] ${sessionId}`));
+        console.log(chalk.gray(`[env] ${new Date().toISOString()}`));
+        console.log(chalk.gray(`[hash] ${randomUUID().slice(0, 12)}`));
+        console.log(chalk.gray(`[mode] TESTING MODE ENABLED`));
+    }
 
+    private logStatus(stage: string, message: string) {
+        console.log(chalk.blueBright(`[vanta:${stage.toLowerCase()}]`), chalk.white(message));
+    }
 
-    /**
-     * Generates and posts new content
-     */
+    private reportHeartbeat() {
+        const timestamp = new Date().toISOString();
+        this.testDiagnostics.heartbeats.push(timestamp);
+        console.log(chalk.gray(`[heartbeat] Vanta ping @ ${timestamp}`));
+    }
+
+    private async transition(to: TwitterState, reason: string) {
+        const from = this.sm.getState();
+        await this.sm.to(to, reason);
+        if (this.isTesting) {
+            this.testDiagnostics.stateTransitions.push({
+                from,
+                to,
+                reason,
+                timestamp: new Date().toISOString()
+            });
+        }
+    }
+
+    async init() {
+        this.logStatus("INIT", "Configuring initial state tree...");
+
+        const initialState: TwitterStateData = {
+            content: [],
+            schedule: {
+                optimal_times: [],
+                frequency: 4,
+                timezone: 'UTC'
+            },
+            engagement: {},
+            strategy: {
+                targetAudience: ['crypto_enthusiasts', 'tech_savvy'],
+                contentThemes: ['project_updates', 'market_insights'],
+                hashtagStrategy: ['#crypto', '#blockchain'],
+                engagementApproach: 'community_focused',
+                postingFrequency: 'moderate'
+            },
+            performance: {
+                avgEngagementRate: 0,
+                topPerformingContent: [],
+                audienceGrowth: 0
+            }
+        };
+
+        this.vt = new VersionedTree<TwitterStateData>({ initialData: initialState });
+
+        await this.transition('READY', 'INITIALIZATION_COMPLETE');
+
+        this.logStatus("READY", "System is prepared for content ops");
+        this.reportHeartbeat();
+    }
+
     async createContent() {
         try {
-            await this.sm.to('ANALYZING_TRENDS', 'START_CONTENT_CREATION');
-            
-            // Analyze trends
+            await this.transition('ANALYZING_TRENDS', 'START_CONTENT_CREATION');
+
             const trends = await this.analyzeTrends();
-            
-            await this.sm.to('GENERATING_CONTENT', 'TRENDS_ANALYZED');
-            
-            // Generate content based on trends
+            await this.transition('GENERATING_CONTENT', 'TRENDS_ANALYZED');
+
             const content = await this.generateContent(trends);
-            
-            await this.sm.to('SCHEDULING_POSTS', 'CONTENT_GENERATED');
-            
-            // Schedule the content
+            await this.transition('SCHEDULING_POSTS', 'CONTENT_GENERATED');
+
             const schedule = await this.scheduleContent(content);
-            
-            await this.sm.to('POSTING', 'CONTENT_SCHEDULED');
-            
-            // Post the content
+            await this.transition('POSTING', 'CONTENT_SCHEDULED');
+
             const postResult = await this.postContent(content, schedule);
-            
-            await this.sm.to('MONITORING_ENGAGEMENT', 'CONTENT_POSTED');
-            
+            await this.transition('MONITORING_ENGAGEMENT', 'CONTENT_POSTED');
+
             return postResult;
-            
         } catch (error) {
             console.error(chalk.red(`[error] Content creation failed`), error);
-            await this.sm.to('ERROR', 'CONTENT_CREATION_FAILED');
+            await this.transition('ERROR', 'CONTENT_CREATION_FAILED');
             throw error;
         }
     }
 
-    /**
-     * Analyzes current Twitter trends
-     */
     private async analyzeTrends() {
         const currentState = this.vt.getCurrentNode().data;
-        
+
         const trendsPrompt = `Analyze current Twitter trends relevant to:
         Target Audience: ${currentState.strategy.targetAudience.join(', ')}
         Content Themes: ${currentState.strategy.contentThemes.join(', ')}
-        
+
         Return trending topics and hashtags as JSON.`;
-        
+
         const response = await prompt("You are a social media trends analyst.", trendsPrompt, 2000);
         return response.content[0].type === 'text' ? JSON.parse(response.content[0].text) : null;
     }
 
-    /**
-     * Generates tweet content based on trends
-     */
     private async generateContent(trends: any): Promise<TwitterContent> {
         const currentState = this.vt.getCurrentNode().data;
-        
+
         const contentPrompt = `Generate engaging tweet content based on:
         Trends: ${JSON.stringify(trends)}
         Strategy: ${JSON.stringify(currentState.strategy)}
-        
+
         Return tweet content as JSON including text, hashtags, and mentions.`;
-        
+
         const response = await prompt("You are a social media content creator.", contentPrompt, 2000);
         return response.content[0].type === 'text' ? JSON.parse(response.content[0].text) : null;
     }
 
-    /**
-     * Schedules content for optimal posting times
-     */
     private async scheduleContent(content: TwitterContent) {
         const currentState = this.vt.getCurrentNode().data;
-        
-        // Add to content queue
+
         currentState.content.push(content);
-        
-        // Calculate optimal posting time
         const scheduledTime = new Date();
-        scheduledTime.setHours(scheduledTime.getHours() + 1); // Simple scheduling logic
-        
+        scheduledTime.setHours(scheduledTime.getHours() + 1);
+
         return scheduledTime;
     }
 
-    /**
-     * Posts content to Twitter
-     */
     private async postContent(content: TwitterContent, scheduledTime: Date): Promise<string> {
-        console.log(chalk.gray(`[post] Scheduled tweet at ${scheduledTime.toISOString()}`));
+        const postedAt = scheduledTime.toISOString();
+        console.log(chalk.gray(`[post] Scheduled tweet at ${postedAt}`));
         console.log(chalk.gray(`[post] Content payload: ${content.text.slice(0, 80)}...`));
+
+        if (this.isTesting) {
+            this.testDiagnostics.postedTweets.push({
+                text: content.text,
+                time: postedAt
+            });
+        }
 
         return 'tweet_id_placeholder';
     }
 
-    /**
-     * Starts monitoring tweet engagement
-     */
     private startMonitoring() {
         if (this.monitoringTimer) {
             clearInterval(this.monitoringTimer);
         }
-        
+
         this.monitoringTimer = setInterval(async () => {
             await this.monitorEngagement();
-        }, 300000); // Monitor every 5 minutes
+        }, 300000); // 5 min
     }
 
-    /**
-     * Monitors tweet engagement
-     */
     private async monitorEngagement() {
-        const currentState = this.vt.getCurrentNode().data;
-        
         try {
-            await this.sm.to('MONITORING_ENGAGEMENT', 'START_MONITORING');
-            
-            // Implement engagement monitoring logic here
-            // This would typically involve querying Twitter API for metrics
-            
-            await this.sm.to('ANALYZING_PERFORMANCE', 'ENGAGEMENT_MONITORED');
+            await this.transition('MONITORING_ENGAGEMENT', 'START_MONITORING');
+            await this.transition('ANALYZING_PERFORMANCE', 'ENGAGEMENT_MONITORED');
             await this.analyzePerformance();
-            
         } catch (error) {
-            console.error('Monitoring error:', error);
-            await this.sm.to('ERROR', 'MONITORING_FAILED');
+            console.error(chalk.red(`[error] Monitoring failed`), error);
+            await this.transition('ERROR', 'MONITORING_FAILED');
         }
     }
 
-    /**
-     * Analyzes tweet performance and adjusts strategy
-     */
     private async analyzePerformance() {
         const currentState = this.vt.getCurrentNode().data;
-        
+
         const analysisPrompt = `Analyze Twitter performance and suggest strategy adjustments:
         Current Performance: ${JSON.stringify(currentState.performance)}
         Current Strategy: ${JSON.stringify(currentState.strategy)}
-        
+
         Suggest strategy adjustments in JSON format.`;
-        
+
         const response = await prompt("You are a social media strategy expert.", analysisPrompt, 2000);
         const newStrategy = response.content[0].type === 'text' ? JSON.parse(response.content[0].text) : {};
-        
-        await this.sm.to('ADJUSTING_STRATEGY', 'ANALYSIS_COMPLETE');
+
+        await this.transition('ADJUSTING_STRATEGY', 'ANALYSIS_COMPLETE');
         currentState.strategy = newStrategy;
-        
-        await this.sm.to('READY', 'STRATEGY_ADJUSTED');
+        await this.transition('READY', 'STRATEGY_ADJUSTED');
     }
 
-    /**
-     * Stops monitoring and cleans up
-     */
     stop() {
         if (this.monitoringTimer) {
             clearInterval(this.monitoringTimer);
             this.monitoringTimer = null;
         }
+
+        if (this.isTesting) {
+            const filename = `vanta_test_log_${this.sessionId}.json`;
+            fs.writeFile(filename, JSON.stringify(this.testDiagnostics, null, 2))
+                .then(() => {
+                    console.log(chalk.green(`[export] Test diagnostics written to ${filename}`));
+                })
+                .catch((err) => {
+                    console.error(chalk.red(`[error] Failed to write diagnostics`), err);
+                });
+        }
     }
-} 
+}
