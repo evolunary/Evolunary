@@ -319,6 +319,35 @@ export class TwitterSubAgent {
         }
     }
 
+    private async perceiveSentimentFromEngagement(tweetId: string) {
+        const currentState = this.vt.getCurrentNode().data;
+        const engagement = currentState.engagement[tweetId];
+
+        if (!engagement) {
+            this.logStatus("PERCEIVE", `No engagement data for ${tweetId}`);
+            return;
+        }
+
+        const { impressions, engagementRate, replies, retweets } = engagement;
+        const rawScore = (engagementRate * 100) + (retweets * 0.5) + (replies * 1.2);
+        const sentiment = Math.min(100, Math.max(0, rawScore / Math.log2(impressions + 2)));
+
+        currentState.performance.avgEngagementRate =
+            (currentState.performance.avgEngagementRate + engagementRate) / 2;
+
+        this.logStatus("PERCEIVE", `Sentiment: ${sentiment.toFixed(2)} from ${impressions} impressions`);
+
+        if (sentiment < 15) {
+            this.logStatus("SENTIMENT", chalk.red("Low reception detected."));
+        } else if (sentiment > 60) {
+            this.logStatus("SENTIMENT", chalk.green("Positive reception detected."));
+        } else {
+            this.logStatus("SENTIMENT", chalk.yellow("Mixed or neutral reaction."));
+        }
+
+        currentState.performance.topPerformingContent.push(tweetId);
+    }
+
     private async analyzePerformance() {
         const currentState = this.vt.getCurrentNode().data;
 
@@ -333,6 +362,11 @@ export class TwitterSubAgent {
 
         await this.transition('ADJUSTING_STRATEGY', 'ANALYSIS_COMPLETE');
         currentState.strategy = newStrategy;
+
+        for (const tweetId of Object.keys(currentState.engagement)) {
+            await this.perceiveSentimentFromEngagement(tweetId);
+        }
+
         await this.transition('READY', 'STRATEGY_ADJUSTED');
     }
 
@@ -354,3 +388,4 @@ export class TwitterSubAgent {
         }
     }
 }
+
