@@ -3,6 +3,16 @@
  * It includes agent state management, versioned memory trees, and AI-guided evolution.
  */
 
+/**
+ * [2025-06-26] Vanta Agent Integration Update:
+ * - TwitterSubAgent now outputs structured diagnostics (state transitions, heartbeats, posts)
+ * - PersonalitySubAgent will ingest Vanta's Twitter behavior as experience soon
+ * - Preparing cross-agent alignment layer for syncing online behavior with evolving internal traits
+ * 
+ * Status: Vanta is active in testing mode with early engagement loops running
+ */
+
+
 import { StateMachine } from "../sm";
 import { TreeNodeJSON, TreeStateJSON, VersionedTree } from "../tree";
 import { prompt } from "../../utils/llm";
@@ -274,6 +284,26 @@ export class PersonaSubAgent {
         );
         
     }
+
+    /**
+ * Ingests a Twitter post (from Vanta) as an external experience
+ * @param tweet The tweet content and metadata
+ */
+async ingestTwitterPost(tweet: { text: string; time: string; metadata?: any }) {
+    const experience = {
+        source: "Vanta:TwitterSubAgent",
+        type: "post",
+        timestamp: tweet.time,
+        content: tweet.text,
+        metadata: tweet.metadata || {}
+    };
+
+    // Feed into persona evolution cycle
+    await this.generateResponse(experience);
+    await this.learn(experience);
+    await this.adapt();
+}
+
             
     /**
      * Initializes the persona with optional starting state
