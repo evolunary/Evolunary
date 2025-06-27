@@ -260,18 +260,25 @@ export class TwitterSubAgent {
         return response.content[0].type === 'text' ? JSON.parse(response.content[0].text) : null;
     }
 
-    private async generateContent(trends: any): Promise<TwitterContent> {
-        const currentState = this.vt.getCurrentNode().data;
+private async generateContent(trends: any): Promise<TwitterContent> {
+    const currentState = this.vt.getCurrentNode().data;
 
-        const contentPrompt = `Generate engaging tweet content based on:
-        Trends: ${JSON.stringify(trends)}
-        Strategy: ${JSON.stringify(currentState.strategy)}
+    const contentPrompt = `Generate a clear, direct tweet based on:
+Trends: ${JSON.stringify(trends)}
+Strategy: ${JSON.stringify(currentState.strategy)}
 
-        Return tweet content as JSON including text, hashtags, and mentions.`;
+Guidelines:
+- Avoid philosophical or abstract statements.
+- Prioritize clarity, practicality, and straightforward language.
+- Include hashtags and mentions where appropriate.
+- Keep it engaging but accessible.
 
-        const response = await prompt("You are a social media content creator.", contentPrompt, 2000);
-        return response.content[0].type === 'text' ? JSON.parse(response.content[0].text) : null;
-    }
+Return tweet content as JSON including text, hashtags, and mentions.`;
+
+    const response = await prompt("You are a concise social media content creator.", contentPrompt, 2000);
+    return response.content[0].type === 'text' ? JSON.parse(response.content[0].text) : null;
+}
+
 
     private async scheduleContent(content: TwitterContent) {
         const currentState = this.vt.getCurrentNode().data;
