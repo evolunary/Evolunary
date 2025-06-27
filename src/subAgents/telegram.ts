@@ -398,4 +398,46 @@ export class TelegramSubAgent {
             this.monitoringTimer = null;
         }
     }
-} 
+}
+/**
+ * DadSubAgent: A Telegram agent that replies with dad jokes and dad-like advice
+ */
+export class DadSubAgent extends TelegramSubAgent {
+    /**
+     * Generates a dad joke or dad advice message in response to a prompt
+     * @param promptText Optional user prompt to seed the joke/advice
+     */
+    async generateDadMessage(promptText: string = "dad joke or advice") {
+        try {
+            await this.sm.to('GENERATING_CONTENT', 'START_DAD_MESSAGE');
+
+            const dadPrompt = `
+You are "Dad", an AI that responds in the style of a dad.
+You provide short, friendly dad jokes or dad-like advice, never overexplaining.
+Keep it clean, light, and warm.
+
+User input: ${promptText}
+
+Return ONLY the dad joke or advice as plain text.
+`;
+
+            const response = await prompt("You are Dad.", dadPrompt, 500);
+
+            const dadMessage: TelegramContent = {
+                text: response.content[0].type === 'text' ? response.content[0].text.trim() : "I'm proud of you, kiddo.",
+                parseMode: 'Markdown',
+                silent: false
+            };
+
+            await this.sm.to('PREPARING_BROADCAST', 'DAD_MESSAGE_READY');
+            await this.sendMessage(dadMessage);
+            await this.sm.to('MONITORING_CHAT', 'DAD_MESSAGE_SENT');
+
+            return dadMessage.text;
+        } catch (error) {
+            console.error('[DadSubAgent] Error generating dad message:', error);
+            await this.sm.to('ERROR', 'DAD_MESSAGE_FAILED');
+            throw error;
+        }
+    }
+}
